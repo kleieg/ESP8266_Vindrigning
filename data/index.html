@@ -1,0 +1,74 @@
+<!DOCTYPE HTML><html>
+<head>
+  <title>ESP Steckerleiste</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" type="text/css" href="style.css">
+  <link rel="icon"  type="image/png" href="favicon.png">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+</head>
+<body>
+  <div class="topnav">
+    <h1>ESP WEB SERVER - Steckerleiste</h1>
+  </div>
+  <div class="content">
+    <div class="card-grid">
+        <div class="card">             
+            <p class="card-title">Hostname / Version</p>
+            <p class ="card-text"><span id="0h"></span></p>
+        </div>
+        <div class="card">             
+          <p class="card-title">MQTT last will topic</p>
+          <p class ="card-text"><span id="1h"></span></p>
+        </div>
+        <div class="card">             
+          <p class="card-title">WiFi RSSI</p>
+          <p class ="card-text"><span id="2h"></span></p>
+        </div>
+        <div class="card">             
+            <p class="card-title">Mqtt_sendInterval</p>
+            <p class ="card-text"><span id="3h"></span></p>
+        </div>
+        <div class="card">             
+            <p class="card-title">Unix timestamp</p>
+            <p class ="card-text"><span id="4h"></span></p>
+        </div>
+        <div class="card">
+            <p class="card-title">Number of Re-connects</p>
+            <p class ="card-text"><span id="5h"></span></p>
+        </div>
+        <div class="card">
+            <p class="card-title">CCS heater</p>
+            <p class ="card-text"><span id="6h"></span></p>
+        </div>
+        <div class="card">
+            <p class="card-title">Reboot</p>
+            <p class ="card-text"><span id="7h"></span></p>
+            <button onclick="myFunction">OK</button>
+        </div>
+        <div class="card">             
+            <p class="card-title">Temperatur</p>
+            <p class ="card-text"><span id="8h"></span></p>
+        </div>
+        <div class="card">             
+            <p class="card-title">Humidity</p>
+            <p class ="card-text"><span id="9h"></span></p>
+        </div>
+        <div class="card">
+            <p class="card-title">eCO2</p>
+            <p class ="card-text"><span id="10h"></span></p>
+        </div>
+        <div class="card">
+            <p class="card-title">TVOC</p>
+            <p class ="card-text"><span id="11h"></span></p>
+        </div>
+        <div class="card">
+            <p class="card-title">CCStemp</p>
+            <p class ="card-text"><span id="12h"></span></p>
+        </div>
+    </div>
+</div>
+<script src="/script.js"></script>
+</body>
+</html>
+
+
