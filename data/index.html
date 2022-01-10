@@ -37,33 +37,43 @@
             <p class ="card-text"><span id="5h"></span></p>
         </div>
         <div class="card">
-            <p class="card-title">CCS heater</p>
-            <p class ="card-text"><span id="6h"></span></p>
-        </div>
-        <div class="card">
             <p class="card-title">Reboot</p>
-            <p class ="card-text"><span id="7h"></span></p>
-            <button onclick="myFunction">OK</button>
+            <p class ="card-text"><span id="6h"></span></p>
+            <button onclick="reboot()">OK</button>
         </div>
         <div class="card">             
             <p class="card-title">Temperatur</p>
-            <p class ="card-text"><span id="8h"></span></p>
+            <p class ="card-text"><span id="7h"></span></p>
         </div>
         <div class="card">             
             <p class="card-title">Humidity</p>
-            <p class ="card-text"><span id="9h"></span></p>
+            <p class ="card-text"><span id="8h"></span></p>
         </div>
         <div class="card">
             <p class="card-title">eCO2</p>
-            <p class ="card-text"><span id="10h"></span></p>
+            <p class ="card-text"><span id="9h"></span></p>
         </div>
         <div class="card">
             <p class="card-title">TVOC</p>
+            <p class ="card-text"><span id="10h"></span></p>
+        </div>
+        <div class="card">
+            <p class="card-title">Baseline</p>
             <p class ="card-text"><span id="11h"></span></p>
         </div>
         <div class="card">
-            <p class="card-title">CCStemp</p>
+            <p class="card-title">SHT31 heater</p>
             <p class ="card-text"><span id="12h"></span></p>
+        </div>
+        <div class="card">
+            <p class="card-title">Temperature Offset</p>
+            <p class ="card-text"><input id="13h" type="text" /></p>
+            <button onclick="setSetting('TempOffset', document.getElementById('13h').value)">OK</button>
+        </div>
+        <div class="card">
+            <p class="card-title">Humidity Offset</p>
+            <p class ="card-text"><input id="14h" type="text"></span></p>
+            <button onclick="setSetting('TempOffset', document.getElementById('14h').value)">OK</button>
         </div>
     </div>
 </div>
