@@ -19,7 +19,7 @@
 
 #include "Settings.h"
 #include "WLAN_Credentials.h"
-
+#include "config.h"
 
 //<<<<<<<<<<<<<<<<
 // current settings
@@ -33,23 +33,6 @@ struct PersistentState
 };
 
 PersistentState g_state;
-
-//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Anpassungen !!!!
-// set hostname used for MQTT tag and WiFi
-#define HOSTNAME "Vindrig"
-#define VERSION "v 0.9.0"
-
-// variables to connects to  MQTT broker
-const char *mqtt_server = "symcon.local";
-
-#define BASELINE_INTERVAL 3600000
-#define MQTT_INTERVAL 120000
-#define RECONNECT_INTERVAL 5000
-#define LED_BLINK_INTERVAL 500
-
-#define GPIO_LED 2
-
-//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<   Anpassungen Ende !!!!
 
 // will be computed as "<HOSTNAME>_<MAC-ADDRESS>"
 String Hostname;
@@ -388,7 +371,7 @@ void setup()
   Serial.println("sensor initialized");
 
   Serial.printf("setup MQTT\n");
-  client.setServer(mqtt_server, 1883);
+  client.setServer(CREDENTIALS_MQTT_BROKER, 1883);
 
   // Route for root / web page
   Serial.printf("set Webpage\n");
