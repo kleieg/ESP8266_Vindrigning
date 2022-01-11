@@ -171,7 +171,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
     {
       notifyClients(getOutputStates());
     }
-    else if (strcmp(json["action"], "reboot"))
+    else if (!strcmp(json["action"], "reboot"))
     {
       Serial.println("Reset..");
       ESP.restart();
