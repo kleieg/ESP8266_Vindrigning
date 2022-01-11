@@ -444,7 +444,6 @@ void loop()
       TVOC = ccs.getTVOC();
       Serial.print(TVOC);
       Serial.println(" ppb");
-
       if (now - lastBaselineUpdate > BASELINE_INTERVAL)
       {
         lastBaselineUpdate = now;
@@ -467,7 +466,8 @@ void loop()
   // SHT30 lesen
   Temp = sht31.readTemperature() + g_state.TempOffset;
   Hum = sht31.readHumidity() + g_state.HumOffset;
-
+  heater = sht31.isHeaterEnabled();
+  
   if (!isnan(Temp))
   { // check if 'is not a number'
     Serial.print("Temp *C = ");
