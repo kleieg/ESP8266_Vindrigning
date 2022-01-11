@@ -17,6 +17,7 @@
 #include "Adafruit_SHT31.h"
 #include "Adafruit_CCS811.h"
 
+#include "VindriktningPM25.h"
 #include "Settings.h"
 #include "WLAN_Credentials.h"
 #include "config.h"
@@ -47,7 +48,7 @@ float TVOC = 0;
 int Baseline = 0;
 long lastBaselineUpdate = 0;
 bool heater = false;
-
+VindriktningPM25::SensorState pm25;
 int WiFi_reconnect = 0;
 
 // for WiFi
@@ -131,10 +132,11 @@ String getOutputStates()
   myArray["cards"][9]["c_text"] = String(TVOC);
   myArray["cards"][10]["c_text"] = String(Baseline);
   myArray["cards"][11]["c_text"] = String(heater ? "true" : "false");
+  myArray["cards"][12]["c_text"] = String(pm25.avgPM25);
 
   // configuration
-  myArray["cards"][12]["c_text"] = String(g_state.TempOffset);
-  myArray["cards"][13]["c_text"] = String(g_state.HumOffset);
+  myArray["cards"][13]["c_text"] = String(g_state.TempOffset);
+  myArray["cards"][14]["c_text"] = String(g_state.HumOffset);
 
   String jsonString = JSON.stringify(myArray);
   return jsonString;
@@ -291,7 +293,7 @@ void MQTTsend()
 {
   JSONVar mqtt_data;
 
-  String mqtt_tag = Hostname + "/SENSOR";
+  String mqtt_tag = Hostname + "/STATUS";
   Serial.printf("%s\n", mqtt_tag.c_str());
 
   mqtt_data["Time"] = My_time;
@@ -301,6 +303,7 @@ void MQTTsend()
   mqtt_data["Hum"] = Hum;
   mqtt_data["eCO2"] = eCO2;
   mqtt_data["TVOC"] = TVOC;
+  mqtt_data["PM25"] = pm25.avgPM25;
 
   String mqtt_string = JSON.stringify(mqtt_data);
 
@@ -323,6 +326,8 @@ void setup()
   initWebSocket();
 
   Serial.println("init sensors\n");
+
+  VindriktningPM25::setup();
 
   Serial.println("check for SHT30\n");
   if (!sht31.begin(0x44))
@@ -425,6 +430,10 @@ void loop()
       led = 0;
     }
   }
+
+  // Vindriktning pm25 sensor lesen
+  VindriktningPM25::handleUart(pm25);
+
   // CCS811 lesen
   if (ccs.available())
   {

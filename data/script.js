@@ -44,7 +44,9 @@ function onMessage(event) {
         console.log(c_text);
         var el = document.getElementById(i + "h");
         if(el.tagName === 'INPUT') {
-            el.value = c_text;
+            if(document.activeElement != el) {
+                el.value = c_text;
+            }
         } else {
             el.innerHTML = c_text;
         }

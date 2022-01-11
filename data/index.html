@@ -17,63 +17,63 @@
             <p class ="card-text"><span id="0h"></span></p>
         </div>
         <div class="card">             
-          <p class="card-title">MQTT last will topic</p>
+          <p class="card-title">WiFi RSSI</p>
           <p class ="card-text"><span id="1h"></span></p>
         </div>
         <div class="card">             
-          <p class="card-title">WiFi RSSI</p>
-          <p class ="card-text"><span id="2h"></span></p>
-        </div>
-        <div class="card">             
             <p class="card-title">Mqtt_sendInterval</p>
-            <p class ="card-text"><span id="3h"></span></p>
+            <p class ="card-text"><span id="2h"></span></p>
         </div>
         <div class="card">             
             <p class="card-title">Unix timestamp</p>
-            <p class ="card-text"><span id="4h"></span></p>
+            <p class ="card-text"><span id="3h"></span></p>
         </div>
         <div class="card">
             <p class="card-title">Number of Re-connects</p>
-            <p class ="card-text"><span id="5h"></span></p>
+            <p class ="card-text"><span id="4h"></span></p>
         </div>
         <div class="card">
             <p class="card-title">Reboot</p>
-            <p class ="card-text"><span id="6h"></span></p>
+            <p class ="card-text"><span id="5h"></span></p>
             <button onclick="reboot()">OK</button>
         </div>
         <div class="card">             
             <p class="card-title">Temperatur</p>
-            <p class ="card-text"><span id="7h"></span></p>
+            <p class ="card-text"><span id="6h"></span></p>
         </div>
         <div class="card">             
             <p class="card-title">Humidity</p>
-            <p class ="card-text"><span id="8h"></span></p>
+            <p class ="card-text"><span id="7h"></span></p>
         </div>
         <div class="card">
             <p class="card-title">eCO2</p>
-            <p class ="card-text"><span id="9h"></span></p>
+            <p class ="card-text"><span id="8h"></span></p>
         </div>
         <div class="card">
             <p class="card-title">TVOC</p>
-            <p class ="card-text"><span id="10h"></span></p>
+            <p class ="card-text"><span id="9h"></span></p>
         </div>
         <div class="card">
             <p class="card-title">Baseline</p>
-            <p class ="card-text"><span id="11h"></span></p>
+            <p class ="card-text"><span id="10h"></span></p>
         </div>
         <div class="card">
             <p class="card-title">SHT31 heater</p>
+            <p class ="card-text"><span id="11h"></span></p>
+        </div>
+        <div class="card">
+            <p class="card-title">PM25</p>
             <p class ="card-text"><span id="12h"></span></p>
         </div>
         <div class="card">
             <p class="card-title">Temperature Offset</p>
             <p class ="card-text"><input id="13h" type="text" /></p>
-            <button onclick="setSetting('TempOffset', document.getElementById('13h').value)">OK</button>
+            <button onclick="setSetting('TempOffset', +document.getElementById('13h').value)">OK</button>
         </div>
         <div class="card">
             <p class="card-title">Humidity Offset</p>
             <p class ="card-text"><input id="14h" type="text"></span></p>
-            <button onclick="setSetting('TempOffset', document.getElementById('14h').value)">OK</button>
+            <button onclick="setSetting('TempOffset', +document.getElementById('14h').value)">OK</button>
         </div>
     </div>
 </div>
