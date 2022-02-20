@@ -11,6 +11,10 @@
 #include <WiFiUdp.h>
 #include <PubSubClient.h>
 
+#include <SoftwareSerial.h> 
+
+#include "MHZ19.h" 
+
 #include <SPI.h>
 #include <Wire.h>
 
@@ -45,11 +49,16 @@ float Temp = 25;
 float Hum = 60;
 float eCO2 = 400;
 float TVOC = 0;
+int CO2 = 0;
+float Temp_mhz19 = 0;
 int Baseline = 0;
 long lastBaselineUpdate = 0;
 bool heater = false;
 VindriktningPM25::SensorState pm25;
 int WiFi_reconnect = 0;
+
+MHZ19 mhz19;
+SoftwareSerial mhz19Serial(GPIO_MHZ19_RX, GPIO_MHZ19_TX);
 
 // for WiFi
 WiFiClient myClient;
@@ -133,10 +142,12 @@ String getOutputStates()
   myArray["cards"][10]["c_text"] = String(Baseline);
   myArray["cards"][11]["c_text"] = String(heater ? "true" : "false");
   myArray["cards"][12]["c_text"] = String(pm25.avgPM25);
+  myArray["cards"][13]["c_text"] = String(CO2);
+  myArray["cards"][14]["c_text"] = String(Temp_mhz19);
 
   // configuration
-  myArray["cards"][13]["c_text"] = String(g_state.TempOffset);
-  myArray["cards"][14]["c_text"] = String(g_state.HumOffset);
+  myArray["cards"][15]["c_text"] = String(g_state.TempOffset);
+  myArray["cards"][16]["c_text"] = String(g_state.HumOffset);
 
   String jsonString = JSON.stringify(myArray);
   return jsonString;
@@ -304,7 +315,8 @@ void MQTTsend()
   mqtt_data["eCO2"] = eCO2;
   mqtt_data["TVOC"] = TVOC;
   mqtt_data["PM25"] = pm25.avgPM25;
-
+  mqtt_data["CO2"] = CO2;
+  
   String mqtt_string = JSON.stringify(mqtt_data);
 
   Serial.printf("%s\n", mqtt_string.c_str());
@@ -326,6 +338,10 @@ void setup()
   initWebSocket();
 
   Serial.println("init sensors\n");
+
+  mhz19Serial.begin(9600);
+  mhz19.begin(mhz19Serial);
+  mhz19.autoCalibration();
 
   VindriktningPM25::setup();
 
@@ -430,6 +446,10 @@ void loop()
       led = 0;
     }
   }
+
+  // MHZ19 lesen
+  CO2 = mhz19.getCO2();
+  Temp_mhz19 = mhz19.getTemperature();
 
   // Vindriktning pm25 sensor lesen
   VindriktningPM25::handleUart(pm25);

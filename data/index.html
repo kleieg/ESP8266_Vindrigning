@@ -65,14 +65,22 @@
             <p class="card-title">PM25</p>
             <p class ="card-text"><span id="12h"></span></p>
         </div>
+        div class="card">
+            <p class="card-title">CO2</p>
+            <p class ="card-text"><span id="13h"></span></p>
+        </div>
+        <div class="card">
+            <p class="card-title">Temperature (MH-Z19)</p>
+            <p class ="card-text"><span id="14h"></span></p>
+        </div>
         <div class="card">
             <p class="card-title">Temperature Offset</p>
-            <p class ="card-text"><input id="13h" type="text" /></p>
+            <p class ="card-text"><input id="15h" type="text" /></p>
             <button onclick="setSetting('TempOffset', +document.getElementById('13h').value)">OK</button>
         </div>
         <div class="card">
             <p class="card-title">Humidity Offset</p>
-            <p class ="card-text"><input id="14h" type="text"></span></p>
+            <p class ="card-text"><input id="16h" type="text"></span></p>
             <button onclick="setSetting('TempOffset', +document.getElementById('14h').value)">OK</button>
         </div>
     </div>

@@ -7,4 +7,7 @@
 #define RECONNECT_INTERVAL 5000
 #define LED_BLINK_INTERVAL 500
 
+#define GPIO_MHZ19_TX 14 // d5
+#define GPIO_MHZ19_RX 12 // d6
+
 #define GPIO_LED 2
