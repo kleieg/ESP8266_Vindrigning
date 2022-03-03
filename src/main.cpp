@@ -19,7 +19,6 @@
 #include <Wire.h>
 
 #include "Adafruit_SHT31.h"
-#include "Adafruit_CCS811.h"
 
 #include "VindriktningPM25.h"
 #include "Settings.h"
@@ -31,8 +30,6 @@
 
 struct PersistentState
 {
-  bool hasBaseline = false;
-  uint16_t Baseline = 0;
   float TempOffset = 0.0f;
   float HumOffset = 0.0f;
 };
@@ -43,16 +40,11 @@ PersistentState g_state;
 String Hostname;
 
 // define sensors & values
-Adafruit_CCS811 ccs;
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
 float Temp = 25;
 float Hum = 60;
-float eCO2 = 400;
-float TVOC = 0;
 int CO2 = 0;
 float Temp_mhz19 = 0;
-int Baseline = 0;
-long lastBaselineUpdate = 0;
 bool heater = false;
 VindriktningPM25::SensorState pm25;
 int WiFi_reconnect = 0;
@@ -137,17 +129,12 @@ String getOutputStates()
   // sensors
   myArray["cards"][6]["c_text"] = String(Temp);
   myArray["cards"][7]["c_text"] = String(Hum);
-  myArray["cards"][8]["c_text"] = String(eCO2);
-  myArray["cards"][9]["c_text"] = String(TVOC);
-  myArray["cards"][10]["c_text"] = String(Baseline);
-  myArray["cards"][11]["c_text"] = String(heater ? "true" : "false");
-  myArray["cards"][12]["c_text"] = String(pm25.avgPM25);
-  myArray["cards"][13]["c_text"] = String(CO2);
-  myArray["cards"][14]["c_text"] = String(Temp_mhz19);
+  myArray["cards"][8]["c_text"] = String(CO2);
+  myArray["cards"][9]["c_text"] = String(pm25.avgPM25);
 
   // configuration
-  myArray["cards"][15]["c_text"] = String(g_state.TempOffset);
-  myArray["cards"][16]["c_text"] = String(g_state.HumOffset);
+  myArray["cards"][10]["c_text"] = String(g_state.TempOffset);
+  myArray["cards"][11]["c_text"] = String(g_state.HumOffset);
 
   String jsonString = JSON.stringify(myArray);
   return jsonString;
@@ -312,8 +299,6 @@ void MQTTsend()
 
   mqtt_data["Temp"] = Temp;
   mqtt_data["Hum"] = Hum;
-  mqtt_data["eCO2"] = eCO2;
-  mqtt_data["TVOC"] = TVOC;
   mqtt_data["PM25"] = pm25.avgPM25;
   mqtt_data["CO2"] = CO2;
   
@@ -340,6 +325,7 @@ void setup()
   Serial.println("init sensors\n");
 
   mhz19Serial.begin(9600);
+
   mhz19.begin(mhz19Serial);
   mhz19.autoCalibration();
 
@@ -353,31 +339,6 @@ void setup()
       delay(1);
   }
   Serial.println("found\n");
-
-  Serial.println("check for CSS811\n");
-  if (!ccs.begin())
-  {
-    Serial.println("Couldn't find CCS811");
-    while (1)
-      delay(1);
-  }
-  Serial.println("found\n");
-  ccs.setDriveMode(CCS811_DRIVE_MODE_1SEC);
-
-  Serial.println("calibrate CSS811\n");
-  //calibrate temperature sensor
-  while (!ccs.available())
-  {
-    delay(3);
-  }
-  if (g_state.hasBaseline)
-  {
-    ccs.setBaseline(g_state.Baseline);
-  }
-  ccs.setEnvironmentalData(Hum, Temp);
-  float temp = ccs.calculateTemperature();
-  ccs.setTempOffset(temp - 25.0);
-  Serial.println("done\n");
 
   Serial.print("Heater Enabled State: ");
   heater = sht31.isHeaterEnabled();
@@ -453,44 +414,6 @@ void loop()
 
   // Vindriktning pm25 sensor lesen
   VindriktningPM25::handleUart(pm25);
-
-  // CCS811 lesen
-  if (ccs.available())
-  {
-
-    // pass in recent env data to increase precision
-    ccs.setEnvironmentalData(Hum, Temp);
-
-    // seems like this call is needed to get reasonable values
-    ccs.calculateTemperature();
-
-    if (ccs.readData())
-    {
-      Serial.print("eCO2: ");
-      eCO2 = ccs.geteCO2();
-      Serial.print(eCO2);
-      Serial.print(" ppm, TVOC: ");
-      TVOC = ccs.getTVOC();
-      Serial.print(TVOC);
-      Serial.println(" ppb");
-      if (now - lastBaselineUpdate > BASELINE_INTERVAL)
-      {
-        lastBaselineUpdate = now;
-        Baseline = ccs.getBaseline();
-        if (!g_state.hasBaseline || g_state.Baseline != Baseline)
-        {
-          Serial.println("Updated CCS baseline");
-          g_state.Baseline = Baseline;
-          g_state.hasBaseline = true;
-          Settings::save(&g_state);
-        }
-      }
-    }
-    else
-    {
-      Serial.println("ERROR!");
-    }
-  }
 
   // SHT30 lesen
   Temp = sht31.readTemperature() + g_state.TempOffset;

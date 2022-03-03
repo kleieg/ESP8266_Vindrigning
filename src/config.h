@@ -7,7 +7,11 @@
 #define RECONNECT_INTERVAL 5000
 #define LED_BLINK_INTERVAL 500
 
-#define GPIO_MHZ19_TX 14 // d5
-#define GPIO_MHZ19_RX 12 // d6
+// currently not used because default pins
+//#define GPIO_IC2_SCL D1
+//#define GPIO_IC2_SCA D2
+
+#define GPIO_MHZ19_TX D5
+#define GPIO_MHZ19_RX D6
 
 #define GPIO_LED 2
