@@ -7,17 +7,20 @@
 namespace Settings {
    template <typename T>
    bool save(const T &data, uint32_t version = 0, const char *file = "/settings.dat") {
-       Serial.println("[Settings] saved");
+      
       File f = LittleFS.open(file, "w");
       f.write((uint8_t*)&version, sizeof(uint32_t));
       f.write((uint8_t*)&data, sizeof(T));
       f.close();
 
+      size_t expectedSize = sizeof(T) + sizeof(uint32_t);
+      Serial.printf("[Settings] saved (%d | %d)\n", f.size(), expectedSize);
+      
       return true;
    }
 
    template <typename T>
-   bool load(const T &data, uint32_t version = 0, const char *file = "/settings.dat") {
+   bool load(T &data, uint32_t version = 0, const char *file = "/settings.dat") {
       if(!LittleFS.exists(file)) {
          Serial.println("[Settings] file not found");
          return false;
@@ -28,15 +31,17 @@ namespace Settings {
       File f = LittleFS.open(file, "r");
       
       if(f.size() != expectedSize) {
-         Serial.printf("[Settings] file size mismatch (%d vs %d)", f.size(), expectedSize);
+         Serial.printf("[Settings] file size mismatch (%d vs %d)\n", f.size(), expectedSize);
          return false;
       }
 
+      Serial.printf("[Settings] file found (%d bytes)\n", expectedSize);
+         
       uint32_t fileVersion;
       f.read((uint8_t *)&fileVersion, sizeof(uint32_t));
 
       if(fileVersion != version) {
-         Serial.printf("[Settings] file version mismatch (%d vs %d)", fileVersion, version);
+         Serial.printf("[Settings] file version mismatch (%d vs %d)\n", fileVersion, version);
          return false;
       }
 

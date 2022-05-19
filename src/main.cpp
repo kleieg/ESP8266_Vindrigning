@@ -48,6 +48,7 @@ float Temp_mhz19 = 0;
 bool heater = false;
 VindriktningPM25::SensorState pm25;
 int WiFi_reconnect = 0;
+bool notify = false;
 
 MHZ19 mhz19;
 SoftwareSerial mhz19Serial(GPIO_MHZ19_RX, GPIO_MHZ19_TX);
@@ -88,7 +89,7 @@ void initLittleFS()
   }
   else
   {
-    Settings::load(&g_state);
+    Settings::load(g_state);
   }
   Serial.println("LittleFS mounted successfully");
 }
@@ -135,6 +136,9 @@ String getOutputStates()
   // configuration
   myArray["cards"][10]["c_text"] = String(g_state.TempOffset);
   myArray["cards"][11]["c_text"] = String(g_state.HumOffset);
+
+  // notify
+  myArray["cards"][12]["c_text"] = String(notify);
 
   String jsonString = JSON.stringify(myArray);
   return jsonString;
@@ -196,7 +200,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       }
       if (updated)
       {
-        Settings::save(&g_state);
+        Settings::save(g_state);
       }
     }
   }
@@ -255,6 +259,8 @@ void reconnect_wifi()
 void reconnect_mqtt()
 {
   String willTopic = Hostname + "/LWT";
+  String cmdTopic = Hostname + "/CMD/+";
+
 #if defined CREDENTIALS_MQTT_USER && defined CREDENTIALS_MQTT_PASSWORD
   if (client.connect(Hostname.c_str(), CREDENTIALS_MQTT_USER, CREDENTIALS_MQTT_PASSWORD, willTopic.c_str(), 0, true, "Offline"))
 #else
@@ -265,6 +271,8 @@ void reconnect_mqtt()
     Serial.printf("%s\n", "connected");
 
     client.publish(willTopic.c_str(), "Online", true);
+
+    client.subscribe(cmdTopic.c_str());
 
     Mqtt_reconnect = Mqtt_reconnect + 1;
   }
@@ -284,12 +292,29 @@ void MQTT_callback(char *topic, byte *message, unsigned int length)
   }
   Serial.println(MQTT_message);
 
+  String notifyTopic = Hostname + "/CMD/Notify";
+  String strTopic = String(topic);
+
+  if(strTopic == notifyTopic) {
+    if (MQTT_message == "true")
+    {
+      notify = true;
+      digitalWrite(GPIO_LED_NOTIFY, HIGH);
+    }
+    else if (MQTT_message == "false")
+    {
+      notify = false;
+      digitalWrite(GPIO_LED_NOTIFY, LOW);
+    }
+    Mqtt_lastSend = now - MQTT_INTERVAL - 10; // --> MQTT send !!
+  }
+
   notifyClients(getOutputStates());
 }
 
 void MQTTsend()
 {
-  JSONVar mqtt_data;
+  JSONVar mqtt_data, sensors, actuators;
 
   String mqtt_tag = Hostname + "/STATUS";
   Serial.printf("%s\n", mqtt_tag.c_str());
@@ -297,10 +322,15 @@ void MQTTsend()
   mqtt_data["Time"] = My_time;
   mqtt_data["RSSI"] = WiFi.RSSI();
 
-  mqtt_data["Temp"] = Temp;
-  mqtt_data["Hum"] = Hum;
-  mqtt_data["PM25"] = pm25.avgPM25;
-  mqtt_data["CO2"] = CO2;
+  sensors["Temp"] = Temp;
+  sensors["Hum"] = Hum;
+  sensors["PM25"] = pm25.avgPM25;
+  sensors["CO2"] = CO2;
+
+  actuators["Notify"] = notify;
+
+  mqtt_data["Sensors"] = sensors;
+  mqtt_data["Actuators"] = actuators;
   
   String mqtt_string = JSON.stringify(mqtt_data);
 
@@ -316,6 +346,9 @@ void setup()
   // Serial port for debugging purposes
   Serial.begin(115200);
   delay(4000); // wait for serial log to be reday
+
+  pinMode(GPIO_LED_NOTIFY, OUTPUT);
+  digitalWrite(GPIO_LED_NOTIFY, LOW);
 
   Serial.println("start init\n");
   initLittleFS();
@@ -354,6 +387,7 @@ void setup()
 
   Serial.printf("setup MQTT\n");
   client.setServer(CREDENTIALS_MQTT_BROKER, 1883);
+  client.setCallback(MQTT_callback);
 
   // Route for root / web page
   Serial.printf("set Webpage\n");
@@ -398,12 +432,12 @@ void loop()
     LEDblink = now;
     if (led == 0)
     {
-      digitalWrite(GPIO_LED, 1);
+      digitalWrite(GPIO_LED_INTERN, 1);
       led = 1;
     }
     else
     {
-      digitalWrite(GPIO_LED, 0);
+      digitalWrite(GPIO_LED_INTERN, 0);
       led = 0;
     }
   }

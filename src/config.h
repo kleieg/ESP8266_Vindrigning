@@ -14,4 +14,6 @@
 #define GPIO_MHZ19_TX D5
 #define GPIO_MHZ19_RX D6
 
-#define GPIO_LED 2
+#define GPIO_LED_NOTIFY D7
+
+#define GPIO_LED_INTERN D4

@@ -3,7 +3,7 @@
 namespace VindriktningPM25
 {
     constexpr static const uint8_t PIN_UART_RX = 0; // GPIO16 = U2_RXD (ESP32)
-    constexpr static const uint8_t PIN_UART_TX = 13; // UNUSED
+    constexpr static const uint8_t PIN_UART_TX = D4; // internal LED
 
     SoftwareSerial sensorSerial(PIN_UART_RX, PIN_UART_TX);
 
