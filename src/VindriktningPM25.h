@@ -1,4 +1,5 @@
 #include <SoftwareSerial.h>
+#include "log.h"
 
 namespace VindriktningPM25
 {
@@ -38,7 +39,7 @@ namespace VindriktningPM25
          */
         const uint16_t pm25 = (serialRxBuf[5] << 8) | serialRxBuf[6];
 
-        Serial.printf("Received PM 2.5 reading: %d\n", pm25);
+        LOG_PRINTF("Received PM 2.5 reading: %d\n", pm25);
         state.measurements[state.measurementIdx] = pm25;
         state.measurementIdx = (state.measurementIdx + 1) % 5;
 
@@ -49,7 +50,7 @@ namespace VindriktningPM25
             }
             state.avgPM25 = avgPM25;
             state.valid = true;
-            Serial.printf("New Avg PM25: %d\n", state.avgPM25);
+            LOG_PRINTF("New Avg PM25: %d\n", state.avgPM25);
         }
 
         clearRxBuf();
@@ -59,7 +60,7 @@ namespace VindriktningPM25
     {
         bool headerValid = serialRxBuf[0] == 0x16 && serialRxBuf[1] == 0x11 && serialRxBuf[2] == 0x0B;
         if (!headerValid) {
-            Serial.println("Received message with invalid header.");
+            LOG_PRINTLN("Received message with invalid header.");
         }
         return headerValid;
     }
@@ -71,7 +72,7 @@ namespace VindriktningPM25
             checksum += serialRxBuf[i];
         }
         if (checksum != 0) {
-            Serial.printf("Received message with invalid checksum. Expected: 0. Actual: %d\n", checksum);
+            LOG_PRINTF("Received message with invalid checksum. Expected: 0. Actual: %d\n", checksum);
         }
         return checksum == 0;
     }
@@ -84,10 +85,10 @@ namespace VindriktningPM25
 
         // @TODO: sometimes multiple messages are received at the same time, only the first is handled
         // not really an issue for now..
-        Serial.print("Receiving:");
+        LOG_PRINT("Receiving:");
         while (sensorSerial.available()) {
             serialRxBuf[rxBufIdx++] = sensorSerial.read();
-            Serial.print(".");
+            LOG_PRINT(".");
 
             // Without this delay, receiving data breaks for reasons that are beyond me
             delay(15);
@@ -97,12 +98,12 @@ namespace VindriktningPM25
             }
         }
 
-        Serial.println("Done.");
+        LOG_PRINTLN("Done.");
 
         if (isValidHeader() && isValidChecksum()) {
             parseState(state);
 
-            Serial.printf(
+            LOG_PRINTF(
                 "Current measurements: %d, %d, %d, %d, %d\n",
 
                 state.measurements[0],

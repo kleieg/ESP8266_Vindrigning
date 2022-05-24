@@ -1,6 +1,6 @@
 <!DOCTYPE HTML><html>
 <head>
-  <title>ESP Steckerleiste</title>
+  <title>ESP Vindriktning</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" type="text/css" href="style.css">
   <link rel="icon"  type="image/png" href="favicon.png">
@@ -8,7 +8,7 @@
 </head>
 <body>
   <div class="topnav">
-    <h1>ESP WEB SERVER - Steckerleiste</h1>
+    <h1>ESP WEB SERVER - Vindriktning</h1>
   </div>
   <div class="content">
     <div class="card-grid">
@@ -54,18 +54,27 @@
             <p class ="card-text"><span id="9h"></span></p>
         </div>
         <div class="card">
+            <p class="card-title">Pressure</p>
+            <p class ="card-text"><span id="10h"></span></p>
+        </div>
+        <div class="card">
             <p class="card-title">Notify</p>
-            <p class ="card-text"><span id="12h"></span></p>
+            <p class ="card-text"><span id="14h"></span></p>
         </div>
         <div class="card">
             <p class="card-title">Temperature Offset</p>
-            <p class ="card-text"><input id="10h" type="text" /></p>
-            <button onclick="setSetting('TempOffset', +document.getElementById('10h').value)">OK</button>
+            <p class ="card-text"><input id="11h" type="text" /></p>
+            <button onclick="setSetting('TempOffset', +document.getElementById('11h').value)">OK</button>
         </div>
         <div class="card">
             <p class="card-title">Humidity Offset</p>
-            <p class ="card-text"><input id="11h" type="text"></span></p>
-            <button onclick="setSetting('HumOffset', +document.getElementById('11h').value)">OK</button>
+            <p class ="card-text"><input id="12h" type="text"></span></p>
+            <button onclick="setSetting('HumOffset', +document.getElementById('12h').value)">OK</button>
+        </div>
+        <div class="card">
+            <p class="card-title">Pressure Offset</p>
+            <p class ="card-text"><input id="13h" type="text"></span></p>
+            <button onclick="setSetting('PressureOffset', +document.getElementById('13h').value)">OK</button>
         </div>
     </div>
 </div>

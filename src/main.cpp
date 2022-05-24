@@ -19,11 +19,13 @@
 #include <Wire.h>
 
 #include "Adafruit_SHT31.h"
+#include <BME280_t.h>
 
 #include "VindriktningPM25.h"
 #include "Settings.h"
 #include "WLAN_Credentials.h"
 #include "config.h"
+#include "log.h"
 
 //<<<<<<<<<<<<<<<<
 // current settings
@@ -32,6 +34,7 @@ struct PersistentState
 {
   float TempOffset = 0.0f;
   float HumOffset = 0.0f;
+  float PressureOffset = 0.0f;
 };
 
 PersistentState g_state;
@@ -41,8 +44,12 @@ String Hostname;
 
 // define sensors & values
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
+BME280<> BMESensor;
+bool hasSHT31 = false;
+
 float Temp = 25;
 float Hum = 60;
+float Pressure = 1013;
 int CO2 = 0;
 float Temp_mhz19 = 0;
 bool heater = false;
@@ -85,13 +92,13 @@ void initLittleFS()
 {
   if (!LittleFS.begin())
   {
-    Serial.println("An error has occurred while mounting LittleFS");
+    LOG_PRINTLN("An error has occurred while mounting LittleFS");
   }
   else
   {
     Settings::load(g_state);
   }
-  Serial.println("LittleFS mounted successfully");
+  LOG_PRINTLN("LittleFS mounted successfully");
 }
 
 // Initialize WiFi
@@ -106,13 +113,13 @@ void initWiFi()
   WiFi.mode(WIFI_STA);
   WiFi.hostname(Hostname);
   WiFi.begin(ssid, password);
-  Serial.print("Connecting to WiFi ..");
+  LOG_PRINT("Connecting to WiFi ..");
   while (WiFi.status() != WL_CONNECTED)
   {
-    Serial.print('.');
+    LOG_PRINT('.');
     delay(1000);
   }
-  Serial.println(WiFi.localIP());
+  LOG_PRINTLN(WiFi.localIP());
 }
 
 String getOutputStates()
@@ -132,13 +139,15 @@ String getOutputStates()
   myArray["cards"][7]["c_text"] = String(Hum);
   myArray["cards"][8]["c_text"] = String(CO2);
   myArray["cards"][9]["c_text"] = String(pm25.avgPM25);
+  myArray["cards"][10]["c_text"] = String(Pressure);
 
   // configuration
-  myArray["cards"][10]["c_text"] = String(g_state.TempOffset);
-  myArray["cards"][11]["c_text"] = String(g_state.HumOffset);
+  myArray["cards"][11]["c_text"] = String(g_state.TempOffset);
+  myArray["cards"][12]["c_text"] = String(g_state.HumOffset);
+  myArray["cards"][13]["c_text"] = String(g_state.PressureOffset);
 
   // notify
-  myArray["cards"][12]["c_text"] = String(notify);
+  myArray["cards"][14]["c_text"] = String(notify);
 
   String jsonString = JSON.stringify(myArray);
   return jsonString;
@@ -157,18 +166,18 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
     // according to AsyncWebServer documentation this is ok
     data[len] = 0;
 
-    Serial.println("Data received: ");
-    Serial.printf("%s\n", data);
+    LOG_PRINTLN("Data received: ");
+    LOG_PRINTF("%s\n", data);
 
     JSONVar json = JSON.parse((const char *)data);
     if (json == nullptr)
     {
-      Serial.println("Request is not valid json, ignoring");
+      LOG_PRINTLN("Request is not valid json, ignoring");
       return;
     }
     if (!json.hasOwnProperty("action"))
     {
-      Serial.println("Request is not valid json, ignoring");
+      LOG_PRINTLN("Request is not valid json, ignoring");
       return;
     }
     if (!strcmp(json["action"], "states"))
@@ -177,14 +186,14 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
     }
     else if (!strcmp(json["action"], "reboot"))
     {
-      Serial.println("Reset..");
+      LOG_PRINTLN("Reset..");
       ESP.restart();
     }
     else if (!strcmp(json["action"], "settings"))
     {
       if (!json.hasOwnProperty("data"))
       {
-        Serial.println("Settings request is missing data, ignoring");
+        LOG_PRINTLN("Settings request is missing data, ignoring");
         return;
       }
       bool updated = false;
@@ -215,11 +224,11 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
   {
   case WS_EVT_CONNECT:
   {
-    Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+    LOG_PRINTF("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
     break;
   }
   case WS_EVT_DISCONNECT:
-    Serial.printf("WebSocket client #%u disconnected\n", client->id());
+    LOG_PRINTF("WebSocket client #%u disconnected\n", client->id());
     break;
   case WS_EVT_DATA:
     handleWebSocketMessage(arg, data, len);
@@ -242,7 +251,7 @@ void initWebSocket()
 // reconnect to WiFi
 void reconnect_wifi()
 {
-  Serial.printf("%s\n", "WiFi try reconnect");
+  LOG_PRINTF("%s\n", "WiFi try reconnect");
   WiFi.begin();
   delay(500);
   if (WiFi.status() == WL_CONNECTED)
@@ -250,7 +259,7 @@ void reconnect_wifi()
     lastReconnectAttempt = 0;
     WiFi_reconnect = WiFi_reconnect + 1;
     // Once connected, publish an announcement...
-    Serial.printf("%s\n", "WiFi reconnected");
+    LOG_PRINTF("%s\n", "WiFi reconnected");
   }
 }
 
@@ -268,7 +277,7 @@ void reconnect_mqtt()
 #endif
   {
     lastReconnectAttempt = 0;
-    Serial.printf("%s\n", "connected");
+    LOG_PRINTF("%s\n", "connected");
 
     client.publish(willTopic.c_str(), "Online", true);
 
@@ -281,16 +290,16 @@ void reconnect_mqtt()
 // receive MQTT messages
 void MQTT_callback(char *topic, byte *message, unsigned int length)
 {
-  Serial.printf("%s", "Message arrived on topic: ");
-  Serial.printf("%s\n", topic);
-  Serial.printf("%s", "Data : ");
+  LOG_PRINTF("%s", "Message arrived on topic: ");
+  LOG_PRINTF("%s\n", topic);
+  LOG_PRINTF("%s", "Data : ");
 
   String MQTT_message;
   for (size_t i = 0; i < length; i++)
   {
     MQTT_message += (char)message[i];
   }
-  Serial.println(MQTT_message);
+  LOG_PRINTLN(MQTT_message);
 
   String notifyTopic = Hostname + "/CMD/Notify";
   String strTopic = String(topic);
@@ -317,13 +326,16 @@ void MQTTsend()
   JSONVar mqtt_data, sensors, actuators;
 
   String mqtt_tag = Hostname + "/STATUS";
-  Serial.printf("%s\n", mqtt_tag.c_str());
+  LOG_PRINTF("%s\n", mqtt_tag.c_str());
 
   mqtt_data["Time"] = My_time;
   mqtt_data["RSSI"] = WiFi.RSSI();
 
   sensors["Temp"] = Temp;
   sensors["Hum"] = Hum;
+  if(!hasSHT31) {
+    sensors["Pressure"] = Pressure;
+  }
   sensors["PM25"] = pm25.avgPM25;
   sensors["CO2"] = CO2;
 
@@ -334,7 +346,7 @@ void MQTTsend()
   
   String mqtt_string = JSON.stringify(mqtt_data);
 
-  Serial.printf("%s\n", mqtt_string.c_str());
+  LOG_PRINTF("%s\n", mqtt_string.c_str());
 
   client.publish(mqtt_tag.c_str(), mqtt_string.c_str());
 
@@ -344,18 +356,19 @@ void MQTTsend()
 void setup()
 {
   // Serial port for debugging purposes
-  Serial.begin(115200);
+  LOG_INIT();
+  
   delay(4000); // wait for serial log to be reday
 
   pinMode(GPIO_LED_NOTIFY, OUTPUT);
   digitalWrite(GPIO_LED_NOTIFY, LOW);
 
-  Serial.println("start init\n");
+  LOG_PRINTLN("start init\n");
   initLittleFS();
   initWiFi();
   initWebSocket();
 
-  Serial.println("init sensors\n");
+  LOG_PRINTLN("init sensors\n");
 
   mhz19Serial.begin(9600);
 
@@ -364,33 +377,42 @@ void setup()
 
   VindriktningPM25::setup();
 
-  Serial.println("check for SHT30\n");
+  LOG_PRINTLN("check for SHT31\n");
   if (!sht31.begin(0x44))
   {
-    Serial.println("Couldn't find SHT30");
-    while (1)
-      delay(1);
-  }
-  Serial.println("found\n");
+    LOG_PRINTLN("Couldn't find SHT31");
+    
+    LOG_PRINTLN("check for BME280\n");
+    if (!BMESensor.begin())
+    {
+      LOG_PRINTLN("Couldn't find bme280");
+      while (1)
+        delay(1);
+    }
+    LOG_PRINTLN("found\n");
+  } else {
+    hasSHT31 = true;
+    LOG_PRINTLN("found\n");
 
-  Serial.print("Heater Enabled State: ");
-  heater = sht31.isHeaterEnabled();
-  if (heater)
-  {
-    Serial.println("ENABLED");
+    LOG_PRINT("Heater Enabled State: ");
+    heater = sht31.isHeaterEnabled();
+    if (heater)
+    {
+      LOG_PRINTLN("ENABLED");
+    }
+    else
+    {
+      LOG_PRINTLN("DISABLED");
+    }
   }
-  else
-  {
-    Serial.println("DISABLED");
-  }
-  Serial.println("sensor initialized");
+  LOG_PRINTLN("sensor initialized");
 
-  Serial.printf("setup MQTT\n");
+  LOG_PRINTF("setup MQTT\n");
   client.setServer(CREDENTIALS_MQTT_BROKER, 1883);
   client.setCallback(MQTT_callback);
 
   // Route for root / web page
-  Serial.printf("set Webpage\n");
+  LOG_PRINTF("set Webpage\n");
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send(LittleFS, "/index.html", "text/html", false); });
 
@@ -400,19 +422,19 @@ void setup()
   #endif
 
   // init NTP
-  Serial.printf("init NTP\n");
+  LOG_PRINTF("init NTP\n");
   timeClient.begin();
   timeClient.setTimeOffset(0);
 
   // Start ElegantOTA
-  Serial.printf("start Elegant OTA\n");
+  LOG_PRINTF("start Elegant OTA\n");
   AsyncElegantOTA.begin(&server);
 
   // Start server
-  Serial.printf("start server\n");
+  LOG_PRINTF("start server\n");
   server.begin();
 
-  Serial.printf("setup finished\n");
+  LOG_PRINTF("setup finished\n");
 }
 
 void loop()
@@ -427,6 +449,7 @@ void loop()
   // LED blinken
   now = millis();
 
+  /*
   if (now - LEDblink > LED_BLINK_INTERVAL)
   {
     LEDblink = now;
@@ -441,6 +464,7 @@ void loop()
       led = 0;
     }
   }
+*/
 
   // MHZ19 lesen
   CO2 = mhz19.getCO2();
@@ -450,29 +474,37 @@ void loop()
   VindriktningPM25::handleUart(pm25);
 
   // SHT30 lesen
-  Temp = sht31.readTemperature() + g_state.TempOffset;
-  Hum = sht31.readHumidity() + g_state.HumOffset;
-  heater = sht31.isHeaterEnabled();
+  if(hasSHT31) {
+    Temp = sht31.readTemperature() + g_state.TempOffset;
+    Hum = sht31.readHumidity() + g_state.HumOffset;
+    heater = sht31.isHeaterEnabled();
+  } else {
+    BMESensor.refresh(); 
+    Temp = BMESensor.temperature;
+    Hum = BMESensor.humidity;
+    Pressure = BMESensor.pressure / 100.0F;
+    heater = false;
+  }
   
   if (!isnan(Temp))
   { // check if 'is not a number'
-    Serial.print("Temp *C = ");
-    Serial.print(Temp);
-    Serial.print("\t\t");
+    LOG_PRINT("Temp *C = ");
+    LOG_PRINT(Temp);
+    LOG_PRINT("\t\t");
   }
   else
   {
-    Serial.println("Failed to read temperature");
+    LOG_PRINTLN("Failed to read temperature");
   }
 
   if (!isnan(Hum))
   { // check if 'is not a number'
-    Serial.print("Hum. % = ");
-    Serial.println(Hum);
+    LOG_PRINT("Hum. % = ");
+    LOG_PRINTLN(Hum);
   }
   else
   {
-    Serial.println("Failed to read humidity");
+    LOG_PRINTLN("Failed to read humidity");
   }
 
   // check WiFi
@@ -483,7 +515,7 @@ void loop()
     {
       lastReconnectAttempt = now;
       // Attempt to reconnect
-      Serial.printf("WiFi reconnect");
+      LOG_PRINTF("WiFi reconnect");
       reconnect_wifi();
     }
   }
@@ -497,7 +529,7 @@ void loop()
       {
         lastReconnectAttempt = now;
         // Attempt to reconnect
-        Serial.printf("MQTT reconnect");
+        LOG_PRINTF("MQTT reconnect");
         reconnect_mqtt();
       }
     }
