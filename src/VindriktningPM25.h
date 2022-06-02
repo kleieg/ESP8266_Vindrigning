@@ -31,7 +31,7 @@ namespace VindriktningPM25
         rxBufIdx = 0;
     }
 
-    void parseState(SensorState& state)
+    bool parseState(SensorState& state)
     {
         /**
          *         MSB  DF 3     DF 4  LSB
@@ -43,6 +43,8 @@ namespace VindriktningPM25
         state.measurements[state.measurementIdx] = pm25;
         state.measurementIdx = (state.measurementIdx + 1) % 5;
 
+        clearRxBuf();
+        
         if (state.measurementIdx == 0) {
             float avgPM25 = 0.0f;
             for (uint8_t i = 0; i < 5; ++i) {
@@ -51,9 +53,9 @@ namespace VindriktningPM25
             state.avgPM25 = avgPM25;
             state.valid = true;
             LOG_PRINTF("New Avg PM25: %d\n", state.avgPM25);
+            return true;
         }
-
-        clearRxBuf();
+        return false;
     }
 
     bool isValidHeader()
@@ -77,10 +79,10 @@ namespace VindriktningPM25
         return checksum == 0;
     }
 
-    void handleUart(SensorState& state)
+    bool handleUart(SensorState& state)
     {
         if (!sensorSerial.available()) {
-            return;
+            return false;
         }
 
         // @TODO: sometimes multiple messages are received at the same time, only the first is handled
@@ -101,19 +103,10 @@ namespace VindriktningPM25
         LOG_PRINTLN("Done.");
 
         if (isValidHeader() && isValidChecksum()) {
-            parseState(state);
-
-            LOG_PRINTF(
-                "Current measurements: %d, %d, %d, %d, %d\n",
-
-                state.measurements[0],
-                state.measurements[1],
-                state.measurements[2],
-                state.measurements[3],
-                state.measurements[4]
-            );
+            return parseState(state);
         } else {
             clearRxBuf();
+            return false;
         }
     }
 }

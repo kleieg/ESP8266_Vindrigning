@@ -11,15 +11,15 @@
 #include <WiFiUdp.h>
 #include <PubSubClient.h>
 
-#include <SoftwareSerial.h> 
+#include <SoftwareSerial.h>
 
-#include "MHZ19.h" 
+#include "MHZ19.h"
 
 #include <SPI.h>
 #include <Wire.h>
 
 #include "Adafruit_SHT31.h"
-#include <BME280_t.h>
+#include <BME280I2C.h>
 
 #include "VindriktningPM25.h"
 #include "Settings.h"
@@ -44,12 +44,24 @@ String Hostname;
 
 // define sensors & values
 Adafruit_SHT31 sht31 = Adafruit_SHT31();
-BME280<> BMESensor;
+
+BME280I2C::Settings settings(
+   BME280::OSR_X1,
+   BME280::OSR_X1,
+   BME280::OSR_X1,
+   BME280::Mode_Forced,
+   BME280::StandbyTime_1000ms,
+   BME280::Filter_Off,
+   BME280::SpiEnable_False,
+   BME280I2C::I2CAddr_0x76 // I2C address. I2C specific.
+);
+
+BME280I2C bme(settings);
 bool hasSHT31 = false;
 
-float Temp = 25;
-float Hum = 60;
-float Pressure = 1013;
+float Temp = 0;
+float Hum = 0;
+float Pressure = 0;
 int CO2 = 0;
 float Temp_mhz19 = 0;
 bool heater = false;
@@ -60,14 +72,16 @@ bool notify = false;
 MHZ19 mhz19;
 SoftwareSerial mhz19Serial(GPIO_MHZ19_RX, GPIO_MHZ19_TX);
 
+long lastSensorRead = 0;
+
 // for WiFi
 WiFiClient myClient;
 long lastReconnectAttempt = 0;
 
 // for MQTT
 PubSubClient client(myClient);
-long Mqtt_lastSend = 0;
 int Mqtt_reconnect = 0;
+bool Mqtt_refresh = false;
 
 // NTP
 WiFiUDP ntpUDP;
@@ -129,7 +143,7 @@ String getOutputStates()
   // system
   myArray["cards"][0]["c_text"] = String(Hostname) + "   /   " + String(VERSION);
   myArray["cards"][1]["c_text"] = String(WiFi.RSSI());
-  myArray["cards"][2]["c_text"] = String(MQTT_INTERVAL) + "ms";
+  myArray["cards"][2]["c_text"] = String(SENSOR_INTERVAL) + "ms";
   myArray["cards"][3]["c_text"] = String(My_time);
   myArray["cards"][4]["c_text"] = "WiFi = " + String(WiFi_reconnect) + "   MQTT = " + String(Mqtt_reconnect);
   myArray["cards"][5]["c_text"] = " to reboot click ok";
@@ -214,7 +228,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
     }
   }
 
-  Mqtt_lastSend = now - MQTT_INTERVAL - 10; // --> MQTT send !!
+  Mqtt_refresh = true;
 }
 
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
@@ -242,9 +256,9 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
 void initWebSocket()
 {
   ws.onEvent(onEvent);
-  #if defined CREDENTIALS_WEB_USER && defined CREDENTIALS_WEB_PASSWORD
-    ws.setAuthentication(CREDENTIALS_WEB_USER, CREDENTIALS_WEB_PASSWORD);
-  #endif
+#if defined CREDENTIALS_WEB_USER && defined CREDENTIALS_WEB_PASSWORD
+  ws.setAuthentication(CREDENTIALS_WEB_USER, CREDENTIALS_WEB_PASSWORD);
+#endif
   server.addHandler(&ws);
 }
 
@@ -304,7 +318,8 @@ void MQTT_callback(char *topic, byte *message, unsigned int length)
   String notifyTopic = Hostname + "/CMD/Notify";
   String strTopic = String(topic);
 
-  if(strTopic == notifyTopic) {
+  if (strTopic == notifyTopic)
+  {
     if (MQTT_message == "true")
     {
       notify = true;
@@ -315,7 +330,7 @@ void MQTT_callback(char *topic, byte *message, unsigned int length)
       notify = false;
       digitalWrite(GPIO_LED_NOTIFY, LOW);
     }
-    Mqtt_lastSend = now - MQTT_INTERVAL - 10; // --> MQTT send !!
+    Mqtt_refresh = true;
   }
 
   notifyClients(getOutputStates());
@@ -331,19 +346,26 @@ void MQTTsend()
   mqtt_data["Time"] = My_time;
   mqtt_data["RSSI"] = WiFi.RSSI();
 
-  sensors["Temp"] = Temp;
-  sensors["Hum"] = Hum;
-  if(!hasSHT31) {
+  if(Temp > 0) {
+    sensors["Temp"] = Temp;
+  }
+  if(Hum > 0) {
+    sensors["Hum"] = Hum;
+  }
+  if (Pressure > 0)
+  {
     sensors["Pressure"] = Pressure;
   }
   sensors["PM25"] = pm25.avgPM25;
-  sensors["CO2"] = CO2;
-
+  if(CO2 > 0) {
+    sensors["CO2"] = CO2;
+  }
+  
   actuators["Notify"] = notify;
 
   mqtt_data["Sensors"] = sensors;
   mqtt_data["Actuators"] = actuators;
-  
+
   String mqtt_string = JSON.stringify(mqtt_data);
 
   LOG_PRINTF("%s\n", mqtt_string.c_str());
@@ -357,7 +379,7 @@ void setup()
 {
   // Serial port for debugging purposes
   LOG_INIT();
-  
+
   delay(4000); // wait for serial log to be reday
 
   pinMode(GPIO_LED_NOTIFY, OUTPUT);
@@ -381,16 +403,18 @@ void setup()
   if (!sht31.begin(0x44))
   {
     LOG_PRINTLN("Couldn't find SHT31");
-    
+
     LOG_PRINTLN("check for BME280\n");
-    if (!BMESensor.begin())
+    if (!bme.begin())
     {
       LOG_PRINTLN("Couldn't find bme280");
       while (1)
         delay(1);
     }
     LOG_PRINTLN("found\n");
-  } else {
+  }
+  else
+  {
     hasSHT31 = true;
     LOG_PRINTLN("found\n");
 
@@ -417,9 +441,9 @@ void setup()
             { request->send(LittleFS, "/index.html", "text/html", false); });
 
   AsyncStaticWebHandler &handler = server.serveStatic("/", LittleFS, "/");
-  #if defined CREDENTIALS_WEB_USER && defined CREDENTIALS_WEB_PASSWORD
-    handler.setAuthentication(CREDENTIALS_WEB_USER, CREDENTIALS_WEB_PASSWORD);
-  #endif
+#if defined CREDENTIALS_WEB_USER && defined CREDENTIALS_WEB_PASSWORD
+  handler.setAuthentication(CREDENTIALS_WEB_USER, CREDENTIALS_WEB_PASSWORD);
+#endif
 
   // init NTP
   LOG_PRINTF("init NTP\n");
@@ -446,10 +470,10 @@ void loop()
   timeClient.update();
   My_time = timeClient.getEpochTime();
 
-  // LED blinken
   now = millis();
 
   /*
+  // LED blinken
   if (now - LEDblink > LED_BLINK_INTERVAL)
   {
     LEDblink = now;
@@ -466,45 +490,58 @@ void loop()
   }
 */
 
-  // MHZ19 lesen
-  CO2 = mhz19.getCO2();
-  Temp_mhz19 = mhz19.getTemperature();
+  bool sendMQTT = false;
 
-  // Vindriktning pm25 sensor lesen
-  VindriktningPM25::handleUart(pm25);
+  // Vindriktning pm25 sensor lesen - unabhaengig von anderen sensoren, da durch externes board gesteuert
+  if(VindriktningPM25::handleUart(pm25)) {
+    sendMQTT = true;
+  }
 
-  // SHT30 lesen
-  if(hasSHT31) {
-    Temp = sht31.readTemperature() + g_state.TempOffset;
-    Hum = sht31.readHumidity() + g_state.HumOffset;
-    heater = sht31.isHeaterEnabled();
-  } else {
-    BMESensor.refresh(); 
-    Temp = BMESensor.temperature;
-    Hum = BMESensor.humidity;
-    Pressure = BMESensor.pressure / 100.0F;
-    heater = false;
-  }
-  
-  if (!isnan(Temp))
-  { // check if 'is not a number'
-    LOG_PRINT("Temp *C = ");
-    LOG_PRINT(Temp);
-    LOG_PRINT("\t\t");
-  }
-  else
+  if (now - lastSensorRead > SENSOR_INTERVAL)
   {
-    LOG_PRINTLN("Failed to read temperature");
-  }
+    lastSensorRead = now;
+    sendMQTT = true;
 
-  if (!isnan(Hum))
-  { // check if 'is not a number'
-    LOG_PRINT("Hum. % = ");
-    LOG_PRINTLN(Hum);
-  }
-  else
-  {
-    LOG_PRINTLN("Failed to read humidity");
+    // MHZ19 lesen
+    CO2 = mhz19.getCO2();
+    Temp_mhz19 = mhz19.getTemperature();
+
+    // SHT30 lesen
+    if (hasSHT31)
+    {
+      Temp = sht31.readTemperature() + g_state.TempOffset;
+      Hum = sht31.readHumidity() + g_state.HumOffset;
+      heater = sht31.isHeaterEnabled();
+    }
+    else
+    {
+      bme.read(Pressure, Temp, Hum);
+      Pressure += g_state.PressureOffset;
+      Hum += g_state.HumOffset;
+      Temp += g_state.TempOffset;
+      heater = false;
+    }
+
+    if (!isnan(Temp))
+    { // check if 'is not a number'
+      LOG_PRINT("Temp *C = ");
+      LOG_PRINT(Temp);
+      LOG_PRINT("\t\t");
+    }
+    else
+    {
+      LOG_PRINTLN("Failed to read temperature");
+    }
+
+    if (!isnan(Hum))
+    { // check if 'is not a number'
+      LOG_PRINT("Hum. % = ");
+      LOG_PRINTLN(Hum);
+    }
+    else
+    {
+      LOG_PRINTLN("Failed to read humidity");
+    }
   }
 
   // check WiFi
@@ -539,9 +576,9 @@ void loop()
       client.loop();
 
       // send data to MQTT broker
-      if (now - Mqtt_lastSend > MQTT_INTERVAL)
+      if (sendMQTT || Mqtt_refresh)
       {
-        Mqtt_lastSend = now;
+        Mqtt_refresh = false;
         MQTTsend();
       }
     }

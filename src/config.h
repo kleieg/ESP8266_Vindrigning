@@ -1,11 +1,10 @@
 // set hostname used for MQTT tag and WiFi
 #define HOSTNAME "Vindrig"
-#define VERSION "v 1.0.1"
+#define VERSION "v 1.1.0"
 
-#define BASELINE_INTERVAL 3600000
-#define MQTT_INTERVAL 120000
 #define RECONNECT_INTERVAL 5000
 #define LED_BLINK_INTERVAL 500
+#define SENSOR_INTERVAL 60000
 
 // currently not used because default pins
 //#define GPIO_IC2_SCL D1
