@@ -27,6 +27,8 @@
 #include "config.h"
 #include "log.h"
 
+#include "utils.h"
+
 //<<<<<<<<<<<<<<<<
 // current settings
 
@@ -506,22 +508,25 @@ void loop()
     CO2 = mhz19.getCO2();
     Temp_mhz19 = mhz19.getTemperature();
 
+    float tempRaw, humRaw;
+    
     // SHT30 lesen
     if (hasSHT31)
     {
-      Temp = sht31.readTemperature() + g_state.TempOffset;
-      Hum = sht31.readHumidity() + g_state.HumOffset;
+      tempRaw = sht31.readTemperature();
+      humRaw = sht31.readHumidity();
       heater = sht31.isHeaterEnabled();
     }
     else
     {
-      bme.read(Pressure, Temp, Hum);
-      Pressure += g_state.PressureOffset;
-      Hum += g_state.HumOffset;
-      Temp += g_state.TempOffset;
+      bme.read(Pressure, tempRaw, humRaw);
       heater = false;
     }
 
+    Pressure += g_state.PressureOffset;
+    Temp = tempRaw + g_state.TempOffset;
+    Hum = calculateRelHumidity(Temp, calculateAbsHumidity(tempRaw, humRaw)) + g_state.HumOffset;
+    
     if (!isnan(Temp))
     { // check if 'is not a number'
       LOG_PRINT("Temp *C = ");
