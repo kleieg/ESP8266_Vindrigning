@@ -3,6 +3,7 @@ adjust relative humidity when using a temperature offset!
 tAdjusted = tRaw + tOffset;
 humAdjusted = calculateRelHumidity(tAdjusted, calculateAbsHumidity(tRaw, humRaw)) + humOffset;
 
+```
 // rel to abs
 // https://carnotcycle.wordpress.com/2012/08/04/how-to-convert-relative-humidity-to-absolute-humidity/
 // abs to rel
@@ -23,3 +24,4 @@ function calculateRelHumidity(t, ah) {
     const mv = (18 / (0.0623665 * (273.15 + t))) * ps;
     return (ah / mv) * 100;
 }
+```
