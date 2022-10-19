@@ -9,7 +9,7 @@
 #include <AsyncElegantOTA.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
-#include <PubSubClient.h>
+#include <MQTT.h>
 
 #include <SoftwareSerial.h>
 
@@ -81,7 +81,7 @@ WiFiClient myClient;
 long lastReconnectAttempt = 0;
 
 // for MQTT
-PubSubClient client(myClient);
+MQTTClient client(256);
 int Mqtt_reconnect = 0;
 bool Mqtt_refresh = false;
 
@@ -268,12 +268,15 @@ void initWebSocket()
 void reconnect_wifi()
 {
   LOG_PRINTF("%s\n", "WiFi try reconnect");
-  WiFi.begin();
+  
+  lastReconnectAttempt = 0;
+  WiFi_reconnect = WiFi_reconnect + 1;
+  
+  WiFi.disconnect();
+  WiFi.reconnect();
   delay(500);
   if (WiFi.status() == WL_CONNECTED)
   {
-    lastReconnectAttempt = 0;
-    WiFi_reconnect = WiFi_reconnect + 1;
     // Once connected, publish an announcement...
     LOG_PRINTF("%s\n", "WiFi reconnected");
   }
@@ -286,48 +289,43 @@ void reconnect_mqtt()
   String willTopic = Hostname + "/LWT";
   String cmdTopic = Hostname + "/CMD/+";
 
+  LOG_PRINTF("%s\n", "MQTT try reconnect");
+
+  lastReconnectAttempt = 0;
+  Mqtt_reconnect = Mqtt_reconnect + 1;
+  
 #if defined CREDENTIALS_MQTT_USER && defined CREDENTIALS_MQTT_PASSWORD
-  if (client.connect(Hostname.c_str(), CREDENTIALS_MQTT_USER, CREDENTIALS_MQTT_PASSWORD, willTopic.c_str(), 0, true, "Offline"))
+  if (client.connect(Hostname.c_str(), CREDENTIALS_MQTT_USER, CREDENTIALS_MQTT_PASSWORD))
 #else
-  if (client.connect(Hostname.c_str(), willTopic.c_str(), 0, true, "Offline"))
+  if (client.connect(Hostname.c_str()))
 #endif
   {
-    lastReconnectAttempt = 0;
     LOG_PRINTF("%s\n", "connected");
 
-    client.publish(willTopic.c_str(), "Online", true);
-
+    client.publish(willTopic.c_str(), "Online", true, 0);
+  
     client.subscribe(cmdTopic.c_str());
-
-    Mqtt_reconnect = Mqtt_reconnect + 1;
+  } else {
+    LOG_PRINTF("Failed to connect to broker; error: %d\n", client.lastError());
   }
 }
 
 // receive MQTT messages
-void MQTT_callback(char *topic, byte *message, unsigned int length)
+void MQTT_callback(String topic, String message)
 {
-  LOG_PRINTF("%s", "Message arrived on topic: ");
-  LOG_PRINTF("%s\n", topic);
-  LOG_PRINTF("%s", "Data : ");
-
-  String MQTT_message;
-  for (size_t i = 0; i < length; i++)
-  {
-    MQTT_message += (char)message[i];
-  }
-  LOG_PRINTLN(MQTT_message);
-
+  LOG_PRINTF("Message arrived on topic: %s; Data: %s\n", topic.c_str(), message.c_str());
+  
   String notifyTopic = Hostname + "/CMD/Notify";
   String strTopic = String(topic);
 
   if (strTopic == notifyTopic)
   {
-    if (MQTT_message == "true")
+    if (message == "true")
     {
       notify = true;
       digitalWrite(GPIO_LED_NOTIFY, HIGH);
     }
-    else if (MQTT_message == "false")
+    else if (message == "false")
     {
       notify = false;
       digitalWrite(GPIO_LED_NOTIFY, LOW);
@@ -336,6 +334,18 @@ void MQTT_callback(char *topic, byte *message, unsigned int length)
   }
 
   notifyClients(getOutputStates());
+}
+
+// initialize MQTT
+void initMQTT() {
+  String willTopic = Hostname + "/LWT";
+  
+  LOG_PRINTF("setup MQTT\n");
+  
+  client.begin(myClient);
+  client.setHost(CREDENTIALS_MQTT_BROKER, 1883);
+  client.onMessage(MQTT_callback);
+  client.setWill(willTopic.c_str(), "Offline", true, 0);
 }
 
 void MQTTsend()
@@ -391,6 +401,7 @@ void setup()
   initLittleFS();
   initWiFi();
   initWebSocket();
+  initMQTT();
 
   LOG_PRINTLN("init sensors\n");
 
@@ -432,10 +443,6 @@ void setup()
     }
   }
   LOG_PRINTLN("sensor initialized");
-
-  LOG_PRINTF("setup MQTT\n");
-  client.setServer(CREDENTIALS_MQTT_BROKER, 1883);
-  client.setCallback(MQTT_callback);
 
   // Route for root / web page
   LOG_PRINTF("set Webpage\n");
@@ -492,17 +499,15 @@ void loop()
   }
 */
 
-  bool sendMQTT = false;
-
   // Vindriktning pm25 sensor lesen - unabhaengig von anderen sensoren, da durch externes board gesteuert
   if(VindriktningPM25::handleUart(pm25)) {
-    sendMQTT = true;
+    Mqtt_refresh = true;
   }
 
   if (now - lastSensorRead > SENSOR_INTERVAL)
   {
     lastSensorRead = now;
-    sendMQTT = true;
+    Mqtt_refresh = true;
 
     // MHZ19 lesen
     CO2 = mhz19.getCO2();
@@ -581,7 +586,8 @@ void loop()
       client.loop();
 
       // send data to MQTT broker
-      if (sendMQTT || Mqtt_refresh)
+      // do not send immediately after connecting, to make sure retained messages can arrive
+      if (Mqtt_refresh && (now - lastReconnectAttempt > PUBLISH_DELAY))
       {
         Mqtt_refresh = false;
         MQTTsend();
