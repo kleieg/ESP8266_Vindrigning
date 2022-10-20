@@ -269,12 +269,11 @@ void reconnect_wifi()
 {
   LOG_PRINTF("%s\n", "WiFi try reconnect");
   
-  lastReconnectAttempt = 0;
   WiFi_reconnect = WiFi_reconnect + 1;
   
-  WiFi.disconnect();
   WiFi.reconnect();
   delay(500);
+  
   if (WiFi.status() == WL_CONNECTED)
   {
     // Once connected, publish an announcement...
@@ -291,7 +290,6 @@ void reconnect_mqtt()
 
   LOG_PRINTF("%s\n", "MQTT try reconnect");
 
-  lastReconnectAttempt = 0;
   Mqtt_reconnect = Mqtt_reconnect + 1;
   
 #if defined CREDENTIALS_MQTT_USER && defined CREDENTIALS_MQTT_PASSWORD
