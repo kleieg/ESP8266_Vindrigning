@@ -7,7 +7,7 @@
  * calculates absolute humidity from temperature and relative humidity
  */
 float calculateAbsHumidity(float t, float rh) {
-    return (6.112f * expf((17.67f * t)/(t + 243.5f)) * rh * 2.1674f)/(t + 243.5f);
+    return (6.112f * expf((17.67f * t)/(t + 243.5f)) * rh * 2.1674f)/(t + 273.15f);
 }
 
 /**

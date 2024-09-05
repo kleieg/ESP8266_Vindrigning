@@ -1,6 +1,6 @@
 // set hostname used for MQTT tag and WiFi
 #define HOSTNAME "Vindrig"
-#define VERSION "v 1.2.1"
+#define VERSION "v 1.2.2"
 
 #define RECONNECT_INTERVAL 5000
 #define PUBLISH_DELAY 5000
